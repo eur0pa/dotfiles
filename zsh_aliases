@@ -1,0 +1,249 @@
+## general-purpose aliases
+#
+USER_AGENT="Mozilla/5.0 (Windows NT 6.1; Win64; x64; rv:47.0) Gecko/20100101 Firefox/47.0"
+
+## fasd
+#alias a='fasd -a'        # any
+#alias s='fasd -si'       # show / search / select
+#alias d='fasd -d'        # directory
+#alias f='fasd -f'        # file
+#alias sd='fasd -sid'     # interactive directory selection
+#alias sf='fasd -sif'     # interactive file selection
+#alias z='fasd_cd -d'     # cd, same functionality as j in autojump
+#alias zz='fasd_cd -d -i' # cd with interactive selection
+
+## built-in
+alias ..='cd ..'
+alias -- -='popd'
+alias zmv='noglob zmv -W'
+
+##
+alias curl='curl -k'
+alias vim='mvim'
+alias vi='vim'
+alias fucking='sudo'
+alias pause='kill -STOP'
+alias unpause='kill -CONT'
+alias mkdir='mkdir -pv'
+
+## git shorties
+alias gco='git checkout'
+alias gpp='git pull; git push'
+alias gwc='git whatchanged -p --abbrev-commit --pretty=medium'
+alias gd='git diff'
+alias gs='git status'
+alias gl='git pull'
+alias gp='git push'
+
+## ls variants
+alias ls='ls -F -G -h'
+alias ll='ls -l'
+alias la='ll -A'
+alias lz='ll -S'
+alias lt='ll -rt'
+
+## ack / grep variants
+alias ag='ag --color --smart-case'
+alias ack='ag'
+alias grep='grep --color=auto'
+alias sgrep='ag -H -C5'
+alias hgrep='fc -El 0 | ag'
+
+## human-readable
+alias du='du -ch'
+alias df='df -h'
+alias free='free -m'
+alias ccat='pygmentize -g -O style=colorful,linenos=1'
+
+## findfile / finddir
+alias ff='find . -type f -iname'
+alias fd='find . -type d -iname'
+
+## flush dns cache
+alias flushdns="dscacheutil -flushcache && killall -HUP mDNSResponder"
+alias sniff="sudo ngrep -d 'en0' -t '^(GET|POST) ' 'tcp and port 80'"
+alias httpdump="sudo tcpdump -i en0 -n -s 0 -w - | grep -a -o -E \"Host\: .*|GET \/.*\""
+
+## gnu-like aliases for hexdump, md5sum, and sha1sum
+command -v hd > /dev/null || alias hd="hexdump -C"
+command -v md5sum > /dev/null || alias md5sum="md5"
+command -v sha1sum > /dev/null || alias sha1sum="shasum"
+function b64d() { echo -n "$@" | base64 -D }
+function b64e() { echo -n "$@" | base64 }
+
+## get local and external ip
+alias rip='dig +short myip.opendns.com @resolver1.opendns.com'
+alias lip='ipconfig getifaddr en0'
+
+## get details for a given address
+function ipinfo(){ curl -s ip-api.com/$1 }
+#function ipinfo() { curl -s ipinfo.io/$1 }
+
+## aws s3 ls/cp
+function s3ls() { aws s3 ls --human-readable --summarize "s3://$1" }
+function s3cp() { [[ -f $1 ]] && { aws s3 cp "$1" "s3://$2" ; return } || aws s3 cp "s3://$1" "$2" }
+
+## utils
+alias trimblanks="sed -E 's/[[:space:]]*$//' "
+alias pg_start='pg_ctl -D /usr/local/var/postgres -l /dev/null start'
+alias pg_stop='pg_ctl -D /usr/local/var/postgres stop'
+alias http='http --pretty=all --style=fruity --verify=no --follow --all'
+alias serve='ruby -run -ehttpd . -p'
+alias ncx='nc -klnv'
+alias curlapi="curl -w 'Status:%{http_code}\tSize:%{size_download}\t%{url_effective}\n' -o/dev/null -sk"
+
+## go build
+alias go-win-64'env GOOS=windows GOARCH=amd64 go build'
+alias go-linux-64='env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -tags netgo -ldflags "-w"'
+alias go-macos='env CGO_ENABLED=0 go build -a -tags netgo -ldflags "-w"'
+
+### pentest aliases and functions
+REMOTE_HOST=
+REMOTE_PORT=
+REMOTE_USER=
+REMOTE_KEY=~/.ssh/id_rsa
+SSH_CMDLINE="ssh -T -o LogLevel=QUIET -p ${REMOTE_PORT} -i ${REMOTE_KEY}"
+REMOTE_CMD="${SSH_CMDLINE} ${REMOTE_USER}@${REMOTE_HOST}"
+SCP_CMDLINE="scp -q -o LogLevel=QUIET -P ${REMOTE_PORT} -i ${REMOTE_KEY} -C"
+REMOTE_CP="${SCP_CMDLINE}"
+
+# useful adb things
+function apk-build()
+{
+    [[ -z ${1} ]] && { echo "usage: $0 <pkg folder>" && return }
+    [[ -d ${1} ]] || { echo "${1} not found" && return }
+    
+    pkg_name=$(grep -oE 'package="[^"]+' ${1}/AndroidManifest.xml | cut -f2 -d'"')
+    [[ -z ${pkg_name} ]] && pkg_name=$(md5 -s `date '+%s'` | awk '{print $4}')
+    
+    echo "building ${pkg_name}"
+    apktool b -o ${pkg_name}-unsafe.apk ${1}
+    
+    apk-sign ${pkg_name}-unsafe.apk && \
+    apk-align ${pkg_name}
+}
+
+function apk-sign()
+{
+    [[ -z ${1} ]] && { echo "usage: $0 <pkg>" && return }
+    [[ -s ${1} ]] || { echo "${1} not found" && return }
+    
+    echo "signing ${1}"
+    jarsigner -sigalg SHA1withRSA -digestalg SHA1 \
+        -keystore ~/data/stuff/android-debug.keystore \
+        ${1} android-debug
+}
+
+function apk-align()
+{
+    [[ -z ${1} ]] && { echo "usage: $0 <pkg>" && return }
+    [[ -s ${1}-unsafe.apk ]] || { echo "${1} not found" && return }
+    
+    echo "aligning ${1}-unsafe.apk"
+    zipalign -f -v 4 ${1}-unsafe.apk ${1}-signed.apk
+}
+
+function adb-pull-pkg()
+{
+    [[ ! ${1} ]] && { echo "usage: ${0} <pkg name>" && return }
+    
+    pkg=$(adb shell cmd package list packages -3 $1 | cut -f2 -d:)
+    [[ -z ${pkg} ]] && { echo "no package found for ${1}" && return }
+    
+    echo "found package: ${pkg}"
+    pkg_path=$(adb shell pm path ${pkg} | cut -f2 -d:)
+    [[ -z ${pkg_path} ]] && { echo "no path found for package ${pkg}" && return }
+    
+    echo "retrieving ${pkg_path}"
+    adb pull ${pkg_path} ${pkg}.apk
+}
+
+## check for wildcard resolvers
+function wild()
+{
+    [[ -z ${1} ]] && return
+    host $(pwgen -A0 32 1).${1}
+}
+
+## certspotter / certsh cli
+function certspotter()
+{
+    curl -s "https://certspotter.com/api/v0/certs?domain=$1" \
+        | jq '.[].dns_names[]' \
+        | sed 's/\"//g' \
+        | sed 's/\*\.//g' \
+        | sort -fu \
+        | grep -F $1
+}
+
+function certsh()
+{
+    curl -s "https://crt.sh/?q=%.$1" \
+        | sed -E 's,</?[^>]+>,,g' \
+        | sort -fu \
+        | grep -Pv "Identity|crt.sh" \
+        | grep -F $1
+}
+
+### bash scriplets
+
+## cd + ls
+function cl() { cd "$1" && ls }
+
+## mkdir + cd
+function mkcd() { mkdir "$1" && cd "$1" }
+
+## take notes
+function todo() {
+    if [[ ! -f $HOME/.todo ]]; then
+        touch "$HOME/.todo"
+    fi
+    if ! (($#)); then
+        cat "$HOME/.todo"
+    elif [[ "$1" == "-l" ]]; then
+        nl -b a "$HOME/.todo"
+    elif [[ "$1" == "-c" ]]; then
+        > $HOME/.todo
+    elif [[ "$1" == "-r" ]]; then
+        nl -b a "$HOME/.todo"
+        eval printf %.0s- '{1..'"${COLUMNS:-$(tput cols)}"\}; echo
+        read -p "Type a number to remove: " number
+        sed -i ${number}d $HOME/.todo "$HOME/.todo"
+    else
+        printf "%s\n" "$*" >> "$HOME/.todo"
+    fi
+}
+
+## calculator
+function calc() { echo "scale=3;$@" | bc -l }
+
+## apt "reverse depend"
+function apt-why() { apt-cache --installed rdepends $* | ack -v $* }
+
+## convert ip to any
+function iptox() { echo "int: $(iptoint $1)" && echo "hex: 0x$(iptohex $1)" }
+
+## dotted-decimal to integer for ips
+function iptoint() {
+    IP=$1; IPNUM=0
+    for (( i=0 ; i<4 ; ++i )); do
+        ((IPNUM+=${IP%%.*}*$((256**$((3-${i}))))))
+        IP=${IP#*.}
+    done
+    echo $IPNUM
+}
+
+## dotted-decimal to hex for ips
+function iptohex() { IP=${1//./ } && printf "%02x" $IP }
+
+## int to dotted-decimal for ips
+function inttoip() {
+    echo -n "ip: "
+    echo -n $(($(($(($((${1}/256))/256))/256))%256)).
+    echo -n $(($(($((${1}/256))/256))%256)).
+    echo -n $(($((${1}/256))%256)).
+    echo "$((${1}%256))"
+}
+
+## hex to int for ips
+function hextoip() { echo "$(inttoip $(($1)))" }
