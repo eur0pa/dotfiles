@@ -43,17 +43,16 @@ alias lz='ll -S'
 alias lt='ll -rt'
 
 ## ack / grep variants
-alias ag='ag --color --smart-case'
-alias ack='ag'
+alias rg='rg --color always --smart-case'
 alias grep='grep --color=auto'
-alias sgrep='ag -H -C5'
+alias sgrep='rg -H -C5'
 alias hgrep='fc -El 0 | ag'
 
 ## human-readable
 alias du='du -ch'
 alias df='df -h'
 alias free='free -m'
-alias ccat='pygmentize -g -O style=colorful,linenos=1'
+alias ccat='bat'
 
 ## findfile / finddir
 alias ff='find . -type f -iname'
